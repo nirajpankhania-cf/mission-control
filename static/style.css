@@ -170,3 +170,7 @@ button.secondary { background: transparent; color: var(--accent); }
 .approve .field { margin: 0; flex: 1; min-width: 200px; }
 .muted { color: var(--muted); }
 .empty { color: var(--muted); font-style: italic; }
+
+.queue-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+.queue-head h2 { margin: 0; }
+.approve[hidden] { display: none; }

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mission Control: Flight Director console</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>MISSION CONTROL &middot; FLIGHT DIRECTOR</h1>
+    <nav>
+      <a href="/">File a report</a>
+      <a href="/console">Console</a>
+    </nav>
+  </header>
+  <main>
+    <div class="banner" id="simulated-banner" hidden>Model steps are simulated: no API key is set, so sorting, checks and drafting use the built-in fake model.</div>
+    <p class="muted" id="model-line"></p>
+    <div class="console">
+      <section class="panel">
+        <div class="queue-head">
+          <h2>Report queue</h2>
+          <button type="button" class="secondary" id="refresh">Refresh</button>
+        </div>
+        <ul class="queue" id="queue"></ul>
+        <p class="empty" id="queue-empty" hidden>No reports filed yet.</p>
+      </section>
+      <section class="panel" id="detail" hidden>
+        <h2 id="detail-title"></h2>
+        <p>
+          <span class="badge" id="detail-verdict"></span>
+          <span class="badge muted" id="detail-severity"></span>
+          <span class="badge review" id="detail-review" hidden></span>
+          <span class="badge" id="detail-briefing-status"></span>
+        </p>
+        <dl class="kv" id="detail-facts"></dl>
+
+        <h3>Briefing</h3>
+        <pre class="briefing-text" id="briefing-text"></pre>
+        <div class="approve" id="approve-form">
+          <div class="field">
+            <label for="approver">Approver name</label>
+            <input type="text" id="approver" name="approver" maxlength="100" placeholder="Flight Director">
+            <div class="error" id="error-approver" aria-live="polite"></div>
+          </div>
+          <button type="button" id="approve">Approve briefing</button>
+        </div>
+        <p class="muted" id="approved-line" hidden></p>
+
+        <h3>Violations</h3>
+        <ul id="violations"></ul>
+
+        <h3>Checks</h3>
+        <ul class="checks" id="checks"></ul>
+
+        <h3>Engineer's note (shown as text)</h3>
+        <pre class="briefing-text" id="note-text"></pre>
+
+        <h3>Trace <span class="muted" id="cost-total"></span></h3>
+        <div class="cards" id="trace"></div>
+      </section>
+    </div>
+  </main>
+  <script src="/static/console.js"></script>
+</body>
+</html>

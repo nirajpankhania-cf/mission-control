@@ -9,6 +9,7 @@ import os
 import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from mission_control import config
 from mission_control.fake_model import FakeModelClient
 from mission_control.pipeline import file_report
 from mission_control.storage import BriefingNotFound, BriefingNotPending, Store
@@ -80,6 +81,8 @@ class MissionControlHandler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         if path == "/":
             self.send_page("index.html")
+        elif path == "/console":
+            self.send_page("console.html")
         elif path == "/api/status":
             self.send_json(200, self.server.status())
         elif path == "/api/reports":
@@ -155,7 +158,13 @@ class MissionControlServer(ThreadingHTTPServer):
         self.quiet = quiet
 
     def status(self):
-        return {"app": "mission-control", "simulated": self.client.name == "fake"}
+        return {
+            "app": "mission-control",
+            "simulated": self.client.name == "fake",
+            "fast_model": config.fast_model(),
+            "strong_model": config.strong_model(),
+            "prices_checked_on": config.PRICES_CHECKED_ON,
+        }
 
     def file_report(self, clean):
         """Save the raw report and run the pipeline; returns the report id."""
