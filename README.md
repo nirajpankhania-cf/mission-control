@@ -155,6 +155,12 @@ TOOL_CHOICES.md              back end, front end, database and model choices
 
 - The test suite was run on Python 3.9.6 (the macOS system Python) and on
   Python 3.14.
+- A fresh clone was checked with both README commands and the key unset, a
+  report was filed, the process stopped and restarted, and the report read
+  back. The two pages were opened in headless Chromium (Playwright): a clean
+  report and a hidden-instruction report with fuel at 97 were filed, the
+  console showed NO GO with the review marker and one card per step, and a
+  briefing was approved from the console with no page errors.
 - The live API path was **not exercised** during development: no
   `ANTHROPIC_API_KEY` was available in the build environment. The real client
   is covered by tests with an injected transport (request shape, headers,
