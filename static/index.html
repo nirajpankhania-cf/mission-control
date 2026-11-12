@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mission Control: file a report</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>MISSION CONTROL</h1>
+    <nav>
+      <a href="/">File a report</a>
+      <a href="/console">Flight Director console</a>
+    </nav>
+  </header>
+  <main class="narrow">
+    <div class="banner" id="simulated-banner" hidden>Model steps are simulated: no API key is set, so sorting, checks and drafting use the built-in fake model.</div>
+    <section class="panel">
+      <h2>Anomaly report</h2>
+      <p class="muted">Readings are checked against the launch limits by code: wind 25 knots or less, temperature 4 C or more, fuel 98 to 100 percent.</p>
+      <form id="report-form" novalidate>
+        <div class="field">
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" maxlength="100" autocomplete="name">
+          <div class="error" id="error-name" aria-live="polite"></div>
+        </div>
+        <div class="field">
+          <label for="station">Station</label>
+          <input type="text" id="station" name="station" maxlength="100" placeholder="e.g. Propulsion, Telemetry, Range Safety">
+          <div class="error" id="error-station" aria-live="polite"></div>
+        </div>
+        <div class="readings">
+          <div class="field">
+            <label for="wind_knots">Wind <span class="hint">knots</span></label>
+            <input type="number" id="wind_knots" name="wind_knots" step="any" inputmode="decimal">
+            <div class="error" id="error-wind_knots" aria-live="polite"></div>
+          </div>
+          <div class="field">
+            <label for="temp_c">Temperature <span class="hint">C</span></label>
+            <input type="number" id="temp_c" name="temp_c" step="any" inputmode="decimal">
+            <div class="error" id="error-temp_c" aria-live="polite"></div>
+          </div>
+          <div class="field">
+            <label for="fuel_pct">Fuel <span class="hint">percent</span></label>
+            <input type="number" id="fuel_pct" name="fuel_pct" step="any" inputmode="decimal">
+            <div class="error" id="error-fuel_pct" aria-live="polite"></div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="note">Note <span class="hint">what you saw, in your own words</span></label>
+          <textarea id="note" name="note" rows="6" maxlength="4000"></textarea>
+          <div class="error" id="error-note" aria-live="polite"></div>
+        </div>
+        <button type="submit" id="submit">File report</button>
+        <div class="status-line" id="status-line" aria-live="polite"></div>
+      </form>
+      <div class="result panel" id="result" hidden>
+        <h3>Filed</h3>
+        <p><span id="result-verdict" class="badge"></span> <span id="result-brief"></span></p>
+        <ul id="result-violations"></ul>
+        <p id="result-review" class="flagged"></p>
+        <p><a href="/console" id="result-link">Open the Flight Director console</a></p>
+      </div>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

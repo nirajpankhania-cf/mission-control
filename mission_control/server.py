@@ -16,16 +16,6 @@ from mission_control.validation import validate_report
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
 MAX_BODY_BYTES = 1024 * 1024
 
-PLACEHOLDER_PAGE = """<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><title>Mission Control</title></head>
-<body>
-<h1>Mission Control</h1>
-<p>The engineer report form and Flight Director console are on their way.</p>
-</body>
-</html>
-"""
-
 REPORT_ID_PATTERN = re.compile(r"^/api/reports/(\d+)$")
 
 
@@ -47,8 +37,8 @@ class MissionControlHandler(BaseHTTPRequestHandler):
         body = json.dumps(payload).encode("utf-8")
         self._send_bytes(status, body, "application/json; charset=utf-8")
 
-    def send_html(self, html):
-        self._send_bytes(200, html.encode("utf-8"), "text/html; charset=utf-8")
+    def send_page(self, filename):
+        self.send_static(filename)
 
     def send_static(self, relative_path):
         safe = os.path.normpath(relative_path).lstrip(os.sep)
@@ -87,7 +77,7 @@ class MissionControlHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = self.path.split("?", 1)[0]
         if path == "/":
-            self.send_html(PLACEHOLDER_PAGE)
+            self.send_page("index.html")
         elif path == "/api/status":
             self.send_json(200, self.server.status())
         elif path == "/api/reports":

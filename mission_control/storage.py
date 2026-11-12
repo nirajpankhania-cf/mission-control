@@ -3,6 +3,7 @@
 One file holds everything. Each call opens its own connection so the
 threading HTTP server can use the store from any thread.
 """
+import contextlib
 import json
 import sqlite3
 from datetime import datetime, timezone
@@ -95,10 +96,16 @@ class Store(object):
         with self._connect() as conn:
             conn.executescript(SCHEMA)
 
+    @contextlib.contextmanager
     def _connect(self):
+        """Open a connection, commit on success and always close it."""
         conn = sqlite3.connect(self.db_path, timeout=10)
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     # ----- reports -------------------------------------------------------
     def save_report(self, clean):
