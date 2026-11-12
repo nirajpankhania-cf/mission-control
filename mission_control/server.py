@@ -9,7 +9,8 @@ import os
 import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from mission_control.limits import check_limits
+from mission_control.fake_model import FakeModelClient
+from mission_control.pipeline import file_report
 from mission_control.storage import Store
 from mission_control.validation import validate_report
 
@@ -122,24 +123,24 @@ class MissionControlServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
 
-    def __init__(self, address, store, quiet=False):
+    def __init__(self, address, store, client, quiet=False):
         ThreadingHTTPServer.__init__(self, address, MissionControlHandler)
         self.store = store
+        self.client = client
         self.quiet = quiet
 
     def status(self):
-        return {"app": "mission-control", "simulated": True}
+        return {"app": "mission-control", "simulated": self.client.name == "fake"}
 
     def file_report(self, clean):
-        """Save the raw report first, then set the verdict from the readings in code."""
-        report_id = self.store.save_report(clean)
-        result = check_limits(clean["wind_knots"], clean["temp_c"], clean["fuel_pct"])
-        self.store.update_report(report_id, verdict=result.verdict, violations=result.violations)
-        return report_id
+        """Save the raw report and run the pipeline; returns the report id."""
+        return file_report(self.store, self.client, clean)
 
 
-def create_server(host="127.0.0.1", port=8000, store=None, db_path=None, quiet=False):
+def create_server(host="127.0.0.1", port=8000, store=None, client=None, db_path=None, quiet=False):
     """Build the server without starting it. Port 0 picks a free port."""
     if store is None:
         store = Store(db_path or "mission_control.db")
-    return MissionControlServer((host, port), store=store, quiet=quiet)
+    if client is None:
+        client = FakeModelClient()
+    return MissionControlServer((host, port), store=store, client=client, quiet=quiet)
