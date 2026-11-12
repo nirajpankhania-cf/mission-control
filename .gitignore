@@ -1,0 +1,25 @@
+# Database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Python caches
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Secrets and local environment
+.env
+.env.*
+*.key
+
+# Editor and OS files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Local scratch output
+/tmp/
+/screenshots/
