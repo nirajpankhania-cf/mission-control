@@ -11,13 +11,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from mission_control.fake_model import FakeModelClient
 from mission_control.pipeline import file_report
-from mission_control.storage import Store
+from mission_control.storage import BriefingNotFound, BriefingNotPending, Store
 from mission_control.validation import validate_report
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
 MAX_BODY_BYTES = 1024 * 1024
 
 REPORT_ID_PATTERN = re.compile(r"^/api/reports/(\d+)$")
+APPROVE_PATTERN = re.compile(r"^/api/briefings/(\d+)/approve$")
 
 
 class MissionControlHandler(BaseHTTPRequestHandler):
@@ -101,6 +102,8 @@ class MissionControlHandler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         if path == "/api/reports":
             self.file_report()
+        elif APPROVE_PATTERN.match(path):
+            self.approve_briefing(int(APPROVE_PATTERN.match(path).group(1)))
         else:
             self.send_json(404, {"error": "not found"})
 
@@ -115,6 +118,28 @@ class MissionControlHandler(BaseHTTPRequestHandler):
             return
         report_id = self.server.file_report(clean)
         self.send_json(201, self.server.store.report_detail(report_id))
+
+    def approve_briefing(self, briefing_id):
+        """A person approves a pending briefing. Nothing else can."""
+        payload = self.read_json_body()
+        if payload is None:
+            return
+        approver = payload.get("approver") if isinstance(payload, dict) else None
+        if not isinstance(approver, str) or not approver.strip():
+            self.send_json(400, {"errors": {"approver": "Approver name is required"}})
+            return
+        if len(approver.strip()) > 100:
+            self.send_json(400, {"errors": {"approver": "Approver name must be 100 characters or fewer"}})
+            return
+        try:
+            briefing = self.server.store.approve_briefing(briefing_id, approver.strip())
+        except BriefingNotFound:
+            self.send_json(404, {"error": "briefing %d not found" % briefing_id})
+            return
+        except BriefingNotPending as conflict:
+            self.send_json(409, {"error": "briefing %d is already %s" % (briefing_id, conflict)})
+            return
+        self.send_json(200, {"briefing": briefing})
 
 
 class MissionControlServer(ThreadingHTTPServer):
