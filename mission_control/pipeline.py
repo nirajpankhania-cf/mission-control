@@ -1,7 +1,7 @@
 """The report pipeline.
 
 Order: save the raw report, limits in code, sort with a model, brief-by
-time in code. Every step appends a trace row. The verdict is set by
+time in code, three checks at the same time. Every step appends a trace row. The verdict is set by
 ``check_limits`` from the three readings before the first model call and
 no later step reads a model reply for it. Nothing here approves anything.
 """
@@ -10,6 +10,7 @@ import traceback
 
 from mission_control import config
 from mission_control.brief_time import brief_by_minutes, effective_severity
+from mission_control.checks import review_reasons_for, run_checks
 from mission_control.limits import check_limits
 from mission_control.pricing import step_cost
 from mission_control.sorting import FALLBACK_SEVERITY, FALLBACK_SUBSYSTEM, sort_report
@@ -99,6 +100,22 @@ def run_pipeline(store, client, report_id):
             "severity": severity, "effective_severity": final_severity,
             "has_violation": has_violation, "brief_by_minutes": minutes,
         }, started)
+
+        # 4. Three checks at the same time. They add review reasons only.
+        started = time.monotonic()
+        results = run_checks(client, config.fast_model(), report)
+        checks = {}
+        for result in results:
+            detail = {"flagged": result.flagged, "reason": result.reason}
+            if result.status == "error":
+                trace.error_step("check_" + result.kind, "model", config.fast_model(), result.error, started)
+            else:
+                detail["raw"] = result.reply.data
+                trace.model_step("check_" + result.kind, config.fast_model(), result.reply, detail,
+                                 started, status=result.status)
+            checks[result.kind] = {"flagged": result.flagged, "reason": result.reason, "status": result.status}
+        review_reasons.extend(review_reasons_for(results))
+        store.update_report(report_id, checks=checks, status="checked")
     except Exception as error:  # pragma: no cover - defensive: keep the verdict and report
         trace.error_step("pipeline", "code", None, error, time.monotonic())
         store.update_report(report_id, status="error")
