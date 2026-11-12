@@ -131,3 +131,100 @@ def build_check_request(model, kind, report):
         task="check_" + kind, model=model, system=CHECK_SYSTEM, prompt=prompt, schema=CHECK_SCHEMA,
         max_tokens=200, effort="low", context=report_context(report),
     )
+
+
+DRAFT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "summary": {"type": "string"},
+        "recommended_action": {"type": "string"},
+    },
+    "required": ["summary", "recommended_action"],
+    "additionalProperties": False,
+}
+
+REVIEW_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "approved": {"type": "boolean"},
+        "feedback": {"type": "string"},
+    },
+    "required": ["approved", "feedback"],
+    "additionalProperties": False,
+}
+
+DRAFT_SYSTEM = (
+    "You draft the body of a one-screen briefing for a Flight Director 90 minutes from launch. "
+    + DATA_RULE +
+    " The verdict, the violations and the brief-by time are fixed facts decided by code and are "
+    "written into the briefing by code; never contradict them and do not restate the verdict. "
+    "Reply with JSON only: summary is two or three plain sentences saying what happened, where "
+    "and when; recommended_action is one sentence the Flight Director can act on."
+)
+
+REVIEW_SYSTEM = (
+    "You review a draft briefing for a Flight Director 90 minutes from launch. " + DATA_RULE +
+    " Approve only if the summary is accurate to the report, consistent with the fixed facts, "
+    "short, calm and specific, and the recommended action is concrete. Reply with JSON only: "
+    "approved is true or false; feedback is one or two sentences the drafter can act on, "
+    "or an empty string when approved."
+)
+
+
+def facts_text(context):
+    """The code-decided facts, written by code, for the draft and review prompts."""
+    violations = context.get("violations") or []
+    if violations:
+        violation_text = "; ".join(
+            "%s = %g (limit %s)" % (v["reading"], float(v["value"]), v["limit"]) for v in violations)
+    else:
+        violation_text = "none"
+    flagged = [kind for kind, check in (context.get("checks") or {}).items() if check.get("flagged")]
+    return (
+        "Fixed facts decided by code:\n"
+        "- verdict: %s\n"
+        "- violations: %s\n"
+        "- subsystem: %s, severity: %s (effective %s)\n"
+        "- brief by: %s minutes\n"
+        "- checks flagged: %s\n"
+        "- review reasons: %s"
+    ) % (
+        context.get("verdict"), violation_text, context.get("subsystem"), context.get("severity"),
+        context.get("effective_severity"), context.get("brief_by_minutes"),
+        ", ".join(flagged) if flagged else "none",
+        ", ".join(context.get("review_reasons") or []) or "none",
+    )
+
+
+def build_draft_request(model, context, round_number, previous_draft=None, feedback=None):
+    parts = ["Draft the briefing body for this report (round %d of 3)." % round_number, facts_text(context)]
+    if previous_draft is not None:
+        parts.append("Previous draft:\nsummary: %s\nrecommended_action: %s" % (
+            previous_draft.get("summary", ""), previous_draft.get("recommended_action", "")))
+    if feedback:
+        parts.append("Reviewer feedback to address in this draft:\n%s" % feedback)
+    parts.append(readings_text(context))
+    parts.append(report_block(context))
+    request_context = dict(context)
+    request_context.update({"round": round_number, "feedback": feedback or ""})
+    return ModelRequest(
+        task="draft", model=model, system=DRAFT_SYSTEM, prompt="\n\n".join(parts), schema=DRAFT_SCHEMA,
+        max_tokens=600, effort="medium", context=request_context,
+    )
+
+
+def build_review_request(model, context, draft, round_number):
+    parts = [
+        "Review this draft briefing body (round %d of 3)." % round_number,
+        facts_text(context),
+        "Draft under review:\nsummary: %s\nrecommended_action: %s" % (
+            draft.get("summary", ""), draft.get("recommended_action", "")),
+        readings_text(context),
+        report_block(context),
+    ]
+    request_context = dict(context)
+    request_context.update({"round": round_number, "draft": draft})
+    return ModelRequest(
+        task="review", model=model, system=REVIEW_SYSTEM, prompt="\n\n".join(parts), schema=REVIEW_SCHEMA,
+        max_tokens=300, effort="medium", context=request_context,
+    )

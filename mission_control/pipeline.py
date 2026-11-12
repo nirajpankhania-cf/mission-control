@@ -1,7 +1,9 @@
 """The report pipeline.
 
 Order: save the raw report, limits in code, sort with a model, brief-by
-time in code, three checks at the same time. Every step appends a trace row. The verdict is set by
+time in code, three checks at the same time, then a draft and review loop
+whose result code wraps in the verdict, violation and brief-by lines.
+Every step appends a trace row. The verdict is set by
 ``check_limits`` from the three readings before the first model call and
 no later step reads a model reply for it. Nothing here approves anything.
 """
@@ -11,6 +13,7 @@ import traceback
 from mission_control import config
 from mission_control.brief_time import brief_by_minutes, effective_severity
 from mission_control.checks import review_reasons_for, run_checks
+from mission_control.drafting import assemble_briefing, draft_and_review
 from mission_control.limits import check_limits
 from mission_control.pricing import step_cost
 from mission_control.sorting import FALLBACK_SEVERITY, FALLBACK_SUBSYSTEM, sort_report
@@ -116,6 +119,36 @@ def run_pipeline(store, client, report_id):
             checks[result.kind] = {"flagged": result.flagged, "reason": result.reason, "status": result.status}
         review_reasons.extend(review_reasons_for(results))
         store.update_report(report_id, checks=checks, status="checked")
+
+        # 5. Draft and review with the strong model, up to three rounds.
+        context = {
+            "verdict": limits.verdict, "violations": limits.violations,
+            "subsystem": subsystem, "severity": severity, "effective_severity": final_severity,
+            "brief_by_minutes": minutes, "checks": checks, "review_reasons": list(review_reasons),
+            "name": report["name"], "station": report["station"], "note": report["note"],
+            "wind_knots": report["wind_knots"], "temp_c": report["temp_c"], "fuel_pct": report["fuel_pct"],
+        }
+        started = time.monotonic()
+        outcome = draft_and_review(client, config.strong_model(), context)
+        for name, reply, detail, status, error in outcome.steps:
+            if status == "error":
+                trace.error_step(name, "model", config.strong_model(), error, started)
+            else:
+                trace.model_step(name, config.strong_model(), reply, detail, started, status=status)
+            started = time.monotonic()
+        review_reasons.extend(outcome.review_reasons)
+        context["review_reasons"] = list(review_reasons)
+
+        # 6. Code assembles the briefing; it is saved pending and only a person approves it.
+        started = time.monotonic()
+        text = assemble_briefing(report, context, outcome.draft)
+        briefing_id = store.save_briefing(
+            report_id, outcome.draft["summary"], outcome.draft["recommended_action"], text, outcome.rounds)
+        trace.code_step("assemble_briefing", {
+            "briefing_id": briefing_id, "rounds": len(outcome.rounds),
+            "reviewer_approved_draft": outcome.approved, "briefing_status": "pending",
+        }, started)
+        store.update_report(report_id, status="briefed")
     except Exception as error:  # pragma: no cover - defensive: keep the verdict and report
         trace.error_step("pipeline", "code", None, error, time.monotonic())
         store.update_report(report_id, status="error")
