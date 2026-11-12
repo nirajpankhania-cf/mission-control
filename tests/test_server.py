@@ -7,6 +7,7 @@ import unittest
 import urllib.error
 import urllib.request
 
+from mission_control.fake_model import FakeModelClient
 from mission_control.server import create_server
 from mission_control.storage import Store
 
@@ -18,7 +19,8 @@ class ServerTestCase(unittest.TestCase):
     def setUpClass(cls):
         cls.tmpdir = tempfile.mkdtemp(prefix="mission-control-")
         cls.store = Store(os.path.join(cls.tmpdir, "test.db"))
-        cls.server = create_server(host="127.0.0.1", port=0, store=cls.store, quiet=True)
+        cls.client = FakeModelClient()
+        cls.server = create_server(host="127.0.0.1", port=0, store=cls.store, client=cls.client, quiet=True)
         cls.port = cls.server.server_address[1]
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
