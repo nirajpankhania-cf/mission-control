@@ -90,6 +90,14 @@ def _row_to_briefing(row):
     return briefing
 
 
+class BriefingNotFound(Exception):
+    """No briefing with that id."""
+
+
+class BriefingNotPending(Exception):
+    """The briefing was already approved (or is otherwise not pending)."""
+
+
 class Store(object):
     def __init__(self, db_path):
         self.db_path = db_path
@@ -202,6 +210,28 @@ class Store(object):
                 "SELECT * FROM briefings WHERE report_id = ? ORDER BY id DESC LIMIT 1", (report_id,)
             ).fetchone()
         return _row_to_briefing(row) if row else None
+
+    def approve_briefing(self, briefing_id, approver):
+        """Approve a pending briefing on behalf of a named person.
+
+        This is the only code that writes the approved status. The update is
+        conditional on the current status, so a second approval conflicts.
+        """
+        approver = (approver or "").strip()
+        if not approver:
+            raise ValueError("approver is required")
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE briefings SET status = 'approved', approved_by = ?, approved_at = ?"
+                " WHERE id = ? AND status = 'pending'",
+                (approver, now_iso(), briefing_id),
+            )
+            if cursor.rowcount == 0:
+                row = conn.execute("SELECT status FROM briefings WHERE id = ?", (briefing_id,)).fetchone()
+                if row is None:
+                    raise BriefingNotFound(briefing_id)
+                raise BriefingNotPending(row["status"])
+        return self.get_briefing(briefing_id)
 
     # ----- detail --------------------------------------------------------
     def report_detail(self, report_id):
