@@ -106,7 +106,7 @@ def assemble_briefing(report, context, draft):
     minutes = context.get("brief_by_minutes")
     severity_note = "severity %s" % context.get("effective_severity")
     if violations and context.get("severity") != "high":
-        severity_note += " (limit violation counts as high)"
+        severity_note += ", a limit violation counts as high"
     lines.append("BRIEF BY: within %s minutes (%s)" % (minutes, severity_note))
     lines.append("SUBSYSTEM: %s" % context.get("subsystem"))
     reasons = context.get("review_reasons") or []
