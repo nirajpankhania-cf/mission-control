@@ -1,18 +1,24 @@
+import json
+import os
+import shutil
+import tempfile
 import threading
 import unittest
 import urllib.error
 import urllib.request
-import json
 
 from mission_control.server import create_server
+from mission_control.storage import Store
 
 
 class ServerTestCase(unittest.TestCase):
-    """Starts the server on a free port in a background thread."""
+    """Starts the server on a free port and a temporary database."""
 
     @classmethod
     def setUpClass(cls):
-        cls.server = create_server(host="127.0.0.1", port=0, quiet=True)
+        cls.tmpdir = tempfile.mkdtemp(prefix="mission-control-")
+        cls.store = Store(os.path.join(cls.tmpdir, "test.db"))
+        cls.server = create_server(host="127.0.0.1", port=0, store=cls.store, quiet=True)
         cls.port = cls.server.server_address[1]
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
@@ -21,6 +27,7 @@ class ServerTestCase(unittest.TestCase):
     def tearDownClass(cls):
         cls.server.shutdown()
         cls.server.server_close()
+        shutil.rmtree(cls.tmpdir, ignore_errors=True)
 
     def url(self, path):
         return "http://127.0.0.1:%d%s" % (self.port, path)
@@ -28,6 +35,21 @@ class ServerTestCase(unittest.TestCase):
     def get(self, path):
         with urllib.request.urlopen(self.url(path), timeout=5) as response:
             return response.status, response.headers, response.read()
+
+    def get_json(self, path):
+        status, headers, body = self.get(path)
+        return status, json.loads(body)
+
+    def post_json(self, path, payload, raw=None):
+        data = raw if raw is not None else json.dumps(payload).encode("utf-8")
+        request = urllib.request.Request(
+            self.url(path), data=data, headers={"Content-Type": "application/json"}, method="POST"
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return response.status, json.loads(response.read())
+        except urllib.error.HTTPError as error:
+            return error.code, json.loads(error.read())
 
 
 class TestSkeleton(ServerTestCase):
@@ -38,9 +60,8 @@ class TestSkeleton(ServerTestCase):
         self.assertIn(b"Mission Control", body)
 
     def test_status_endpoint_reports_simulated_mode(self):
-        status, headers, body = self.get("/api/status")
+        status, payload = self.get_json("/api/status")
         self.assertEqual(status, 200)
-        payload = json.loads(body)
         self.assertIn("simulated", payload)
 
     def test_unknown_path_is_404(self):
