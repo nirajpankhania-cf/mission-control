@@ -88,7 +88,7 @@ def build_sort_request(model, report):
         readings_text(report), report_block(report))
     return ModelRequest(
         task="sort", model=model, system=SORT_SYSTEM, prompt=prompt, schema=SORT_SCHEMA,
-        max_tokens=300, effort="low", context=report_context(report),
+        max_tokens=2000, effort="low", context=report_context(report),
     )
 
 
@@ -129,7 +129,7 @@ def build_check_request(model, kind, report):
     prompt = "%s\n\n%s\n\n%s" % (CHECK_QUESTIONS[kind], readings_text(report), report_block(report))
     return ModelRequest(
         task="check_" + kind, model=model, system=CHECK_SYSTEM, prompt=prompt, schema=CHECK_SCHEMA,
-        max_tokens=200, effort="low", context=report_context(report),
+        max_tokens=2000, effort="low", context=report_context(report),
     )
 
 
@@ -209,7 +209,7 @@ def build_draft_request(model, context, round_number, previous_draft=None, feedb
     request_context.update({"round": round_number, "feedback": feedback or ""})
     return ModelRequest(
         task="draft", model=model, system=DRAFT_SYSTEM, prompt="\n\n".join(parts), schema=DRAFT_SCHEMA,
-        max_tokens=600, effort="medium", context=request_context,
+        max_tokens=4000, effort="medium", context=request_context,
     )
 
 
@@ -226,5 +226,5 @@ def build_review_request(model, context, draft, round_number):
     request_context.update({"round": round_number, "draft": draft})
     return ModelRequest(
         task="review", model=model, system=REVIEW_SYSTEM, prompt="\n\n".join(parts), schema=REVIEW_SCHEMA,
-        max_tokens=300, effort="medium", context=request_context,
+        max_tokens=3000, effort="medium", context=request_context,
     )
