@@ -10,6 +10,7 @@ import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from mission_control import config
+from mission_control.anthropic_client import AnthropicClient
 from mission_control.fake_model import FakeModelClient
 from mission_control.pipeline import file_report
 from mission_control.storage import BriefingNotFound, BriefingNotPending, Store
@@ -171,10 +172,22 @@ class MissionControlServer(ThreadingHTTPServer):
         return file_report(self.store, self.client, clean)
 
 
+def choose_client():
+    """The real client when ANTHROPIC_API_KEY is set, otherwise the fake."""
+    key = config.api_key()
+    if key:
+        return AnthropicClient(key)
+    return FakeModelClient()
+
+
 def create_server(host="127.0.0.1", port=8000, store=None, client=None, db_path=None, quiet=False):
-    """Build the server without starting it. Port 0 picks a free port."""
+    """Build the server without starting it. Port 0 picks a free port.
+
+    Tests always pass an explicit fake client; only run.py lets the
+    environment choose.
+    """
     if store is None:
         store = Store(db_path or "mission_control.db")
     if client is None:
-        client = FakeModelClient()
+        client = choose_client()
     return MissionControlServer((host, port), store=store, client=client, quiet=quiet)
